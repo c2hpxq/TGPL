@@ -36,8 +36,9 @@ func Gensvg() {
 		for j := 0; j < cells; j++ {
 			x := xyrange * (float64(i)/cells - 0.5)
 			y := xyrange * (float64(j)/cells - 0.5)
-			zmax = math.Max(f(x, y), zmax)
-			zmin = math.Min(f(x, y), zmin)
+			t, _ := f(x, y)
+			zmax = math.Max(t, zmax)
+			zmin = math.Min(t, zmin)
 		}
 	}
 	fmt.Println(zmax, zmin)
@@ -45,39 +46,42 @@ func Gensvg() {
 		for j := 0; j < cells; j++ {
 			x := xyrange * (float64(i)/cells - 0.5)
 			y := xyrange * (float64(j)/cells - 0.5)
-			zij := f(x, y)
-			ax, ay := corner(i+1, j)
-			bx, by := corner(i, j)
-			cx, cy := corner(i, j+1)
-			dx, dy := corner(i+1, j+1)
-			fmt.Printf("<polygon points='%g,%g %g,%g %g,%g %g,%g' fill='rgb(%d, 0, %d)'/>\n",
-				ax, ay, bx, by, cx, cy, dx, dy, int((zij-zmin)/(zmax-zmin)*255), int((zmax-zij)/(zmax-zmin)*255))
+			zij, nanz := f(x, y)
+			ax, ay, nana := corner(i+1, j)
+			bx, by,  nanb:= corner(i, j)
+			cx, cy, nanc := corner(i, j+1)
+			dx, dy, nand := corner(i+1, j+1)
+			if !(nanz||nana||nanb||nanc||nand) {
+				fmt.Printf("<polygon points='%g,%g %g,%g %g,%g %g,%g' fill='rgb(%d, 0, %d)'/>\n",
+					ax, ay, bx, by, cx, cy, dx, dy, int((zij-zmin)/(zmax-zmin)*255), int((zmax-zij)/(zmax-zmin)*255))
+			}
 		}
 	}
 	fmt.Println("</svg>")
 }
 
-func corner(i, j int) (float64, float64) {
+func corner(i, j int) (float64, float64, bool) {
 	// Find point (x,y) at corner of cell (i,j).
 	x := xyrange * (float64(i)/cells - 0.5)
 	y := xyrange * (float64(j)/cells - 0.5)
 
 	// Compute surface height z.
-	z := f(x, y)
+	z, nan := f(x, y)
 
 	// Project (x,y,z) isometrically onto 2-D SVG canvas (sx,sy).
 	sx := width/2 + (x-y)*cos30*xyscale
 	sy := height/2 + (x+y)*sin30*xyscale - z*zscale
-	return sx, sy
+	return sx, sy, nan
 }
 
-func f(x, y float64) float64 {
+func f(x, y float64) (float64, bool) {
 	//r := math.Hypot(x, y) // distance from (0,0)
 	//if r < 0.001 {
 	//	return 1.0
 	//}
 	//return math.Sin(r) / r
-	return 0.2 * (math.Cos(x) + math.Cos(y))
+	res := 0.2 * (math.Cos(x) + math.Cos(y))
+	return res, math.IsNaN(res) || math.IsInf(res, +1) || math.IsInf(res, -1)
 }
 
 //!-
