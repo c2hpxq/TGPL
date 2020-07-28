@@ -32,8 +32,8 @@ func main() {
 //!+visit
 // visit appends to links each link found in n and returns the result.
 func visit(dataCount map[string]int, n *html.Node) {
-	if n.Type == html.ElementNode {
-		dataCount[n.Data]++
+	if n.Type == html.TextNode && n.Data != "script" && n.Data != "style" {
+		fmt.Println(n.Data)
 	}
 	/*
 	for c := n.FirstChild; c != nil; c = c.NextSibling {

@@ -8,8 +8,12 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"gopl.io/ch5/links"
 )
@@ -34,22 +38,40 @@ func breadthFirst(f func(item string) []string, worklist []string) {
 
 //!-breadthFirst
 
-//!+crawl
-func crawl(url string) []string {
-	fmt.Println(url)
-	list, err := links.Extract(url)
-	if err != nil {
-		log.Print(err)
-	}
-	return list
-}
 
-//!-crawl
 
 //!+main
 func main() {
 	// Crawl the web breadth-first,
 	// starting from the command-line arguments.
+	//!+crawl
+	var order int
+	crawl := func(url string) []string {
+		if strings.HasPrefix(url, os.Args[1]) {
+			fmt.Printf("fetching %s\n", url)
+			resp, err := http.Get(url)
+			if err != nil {
+				log.Fatal(err)
+			}
+			b, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("length of content: %d\n", len(b))
+			err = ioutil.WriteFile(strconv.Itoa(order) + ".html", b, 0644)
+			if err != nil {
+				log.Fatal(err)
+			}
+			order++
+		}
+		list, err := links.Extract(url)
+		if err != nil {
+		log.Print(err)
+	}
+		return list
+	}
+
+	//!-crawl
 	breadthFirst(crawl, os.Args[1:])
 }
 

@@ -8,6 +8,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sort"
 )
 
@@ -15,6 +16,7 @@ import (
 // prereqs maps computer science courses to their prerequisites.
 var prereqs = map[string][]string{
 	"algorithms": {"data structures"},
+	"linear algebra": {"calculus"},
 	"calculus":   {"linear algebra"},
 
 	"compilers": {
@@ -36,24 +38,37 @@ var prereqs = map[string][]string{
 
 //!+main
 func main() {
-	for i, course := range topoSort(prereqs) {
+	order, containLoop := topoSort(prereqs)
+	if containLoop {
+		log.Fatal("contain loop!")
+	}
+	for i, course := range order {
 		fmt.Printf("%d:\t%s\n", i+1, course)
 	}
 }
 
-func topoSort(m map[string][]string) []string {
+func topoSort(m map[string][]string) ([]string, bool) {
 	var order []string
 	seen := make(map[string]bool)
-	var visitAll func(items []string)
+	inStack := make(map[string]bool)
+	var visitAll func(items []string) bool
 
-	visitAll = func(items []string) {
+	visitAll = func(items []string) bool {
 		for _, item := range items {
+			if inStack[item] {
+				return true
+			}
 			if !seen[item] {
+				inStack[item] = true
 				seen[item] = true
-				visitAll(m[item])
+				if visitAll(m[item]) {
+					return true
+				}
 				order = append(order, item)
+				inStack[item] = false
 			}
 		}
+		return false
 	}
 
 	var keys []string
@@ -62,8 +77,10 @@ func topoSort(m map[string][]string) []string {
 	}
 
 	sort.Strings(keys)
-	visitAll(keys)
-	return order
+	if visitAll(keys) {
+		return nil, true
+	}
+	return order, false
 }
 
 //!-main

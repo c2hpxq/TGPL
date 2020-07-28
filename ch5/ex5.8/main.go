@@ -8,19 +8,29 @@ package main
 
 import (
 	"fmt"
+	"html/template"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"golang.org/x/net/html"
 )
 
+const templ = `{{range .Attr}} {{.Key}}: "{{.Val}}" {{end}}`
+var report *template.Template
 func main() {
+	var err error
+	report, err = template.New("report").Parse(templ)
+	if err != nil {
+		log.Fatal(err)
+	}
 	for _, url := range os.Args[1:] {
-		outline(url)
+		FindID(url, "js-clientConfig")
 	}
 }
 
-func outline(url string) error {
+func FindID(url string, id string ) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -32,22 +42,11 @@ func outline(url string) error {
 		return err
 	}
 
-	var depth int
-	startElement := func (n *html.Node) {
-		if n.Type == html.ElementNode {
-			fmt.Printf("%*s<%s>\n", depth*2, "", n.Data)
-			depth++
-		}
-	}
-
-	endElement := func (n *html.Node) {
-		if n.Type == html.ElementNode {
-			depth--
-			fmt.Printf("%*s</%s>\n", depth*2, "", n.Data)
-		}
+	startElement := func (n *html.Node) bool {
+		return idMatch(n, id)
 	}
 	//!+call
-	forEachNode(doc, startElement, endElement)
+	fmt.Println(forEachNode(doc, startElement, nil))
 	//!-call
 
 	return nil
@@ -58,18 +57,40 @@ func outline(url string) error {
 // x in the tree rooted at n. Both functions are optional.
 // pre is called before the children are visited (preorder) and
 // post is called after (postorder).
-func forEachNode(n *html.Node, pre, post func(n *html.Node)) {
+func forEachNode(n *html.Node, pre, post func(n *html.Node) bool) *html.Node {
 	if pre != nil {
-		pre(n)
+		if pre(n) {
+			return n
+		}
 	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		forEachNode(c, pre, post)
+		m := forEachNode(c, pre, post)
+		if m != nil {
+			return m
+		}
 	}
 
 	if post != nil {
-		post(n)
+		if post(n) {
+			return n
+		}
 	}
+
+	return nil
 }
 
 //!-forEachNode
+
+//!+startend
+var depth int
+func idMatch(n *html.Node, id string) bool {
+	for _, a := range n.Attr {
+		if strings.ToLower(a.Key) == "id" && a.Val == id{
+			return true
+		}
+	}
+	return false
+}
+
+//!-startend

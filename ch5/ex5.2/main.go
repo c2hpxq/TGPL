@@ -20,8 +20,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "findlinks1: %v\n", err)
 		os.Exit(1)
 	}
-	for _, link := range visit(nil, doc) {
-		fmt.Println(link)
+	m := make(map[string]int)
+	visit(m, doc)
+	for k, v := range m {
+		fmt.Printf("Data named %s appears %d times\n", k, v)
 	}
 }
 
@@ -29,13 +31,9 @@ func main() {
 
 //!+visit
 // visit appends to links each link found in n and returns the result.
-func visit(links []string, n *html.Node) []string {
-	if n.Type == html.ElementNode && n.Data == "a" {
-		for _, a := range n.Attr {
-			if a.Key == "href" {
-				links = append(links, a.Val)
-			}
-		}
+func visit(dataCount map[string]int, n *html.Node) {
+	if n.Type == html.ElementNode {
+		dataCount[n.Data]++
 	}
 	/*
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
@@ -43,12 +41,11 @@ func visit(links []string, n *html.Node) []string {
 	}
 	 */
 	if n.NextSibling != nil {
-		links = visit(links, n.NextSibling)
+		visit(dataCount, n.NextSibling)
 	}
 	if n.FirstChild != nil {
-		links = visit(links, n.FirstChild)
+		visit(dataCount, n.FirstChild)
 	}
-	return links
 }
 
 //!-visit

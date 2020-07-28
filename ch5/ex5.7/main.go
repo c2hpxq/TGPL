@@ -8,13 +8,23 @@ package main
 
 import (
 	"fmt"
+	"html/template"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"golang.org/x/net/html"
 )
 
+const templ = `{{range .Attr}} {{.Key}}: "{{.Val}}" {{end}}`
+var report *template.Template
 func main() {
+	var err error
+	report, err = template.New("report").Parse(templ)
+	if err != nil {
+		log.Fatal(err)
+	}
 	for _, url := range os.Args[1:] {
 		outline(url)
 	}
@@ -32,20 +42,6 @@ func outline(url string) error {
 		return err
 	}
 
-	var depth int
-	startElement := func (n *html.Node) {
-		if n.Type == html.ElementNode {
-			fmt.Printf("%*s<%s>\n", depth*2, "", n.Data)
-			depth++
-		}
-	}
-
-	endElement := func (n *html.Node) {
-		if n.Type == html.ElementNode {
-			depth--
-			fmt.Printf("%*s</%s>\n", depth*2, "", n.Data)
-		}
-	}
 	//!+call
 	forEachNode(doc, startElement, endElement)
 	//!-call
@@ -73,3 +69,43 @@ func forEachNode(n *html.Node, pre, post func(n *html.Node)) {
 }
 
 //!-forEachNode
+
+//!+startend
+var depth int
+func startElement(n *html.Node) {
+	switch n.Type {
+	case html.ElementNode:
+		fmt.Printf("%*s<%s", depth*2, "", n.Data)
+		if err := report.Execute(os.Stdout, n); err != nil {
+			log.Fatal(err)
+		}
+		if n.FirstChild ==nil {
+			fmt.Println("/>")
+		} else {
+			fmt.Println(">")
+			depth++
+		}
+
+	case html.TextNode:
+		text := strings.TrimSpace(n.Data)
+		if (len(text)>0) {
+			for _, line := range strings.Split(text, "\n") {
+				fmt.Printf("%*s%s\n", depth*2, "", strings.TrimSpace(line))
+			}
+		}
+	case html.CommentNode:
+		fmt.Printf("<!--%s-->\n", n.Data)
+	}
+}
+
+func endElement(n *html.Node) {
+	if n.Type == html.ElementNode {
+		if n.FirstChild == nil {
+			return
+		}
+		depth--
+		fmt.Printf("%*s</%s>\n", depth*2, "", n.Data)
+	}
+}
+
+//!-startend
