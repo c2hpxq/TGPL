@@ -8,11 +8,14 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"math/cmplx"
 	"os"
+	"runtime"
+	"sync"
 )
 
 func main() {
@@ -21,16 +24,37 @@ func main() {
 		width, height          = 1024, 1024
 	)
 
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	fmt.Fprintf(os.Stderr, "num of cpu: %d\n", runtime.NumCPU())
+
+	jobs := make(chan int, 128)
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	for py := 0; py < height; py++ {
-		y := float64(py)/height*(ymax-ymin) + ymin
-		for px := 0; px < width; px++ {
-			x := float64(px)/width*(xmax-xmin) + xmin
-			z := complex(x, y)
-			// Image point (px, py) represents complex value z.
-			img.Set(px, py, mandelbrot(z))
-		}
+	var w sync.WaitGroup
+
+	// #goroutine=7~8 is most suitable on a 8 logical core cpu machine
+	// roughly achieve 370% cpu usage
+	for i := 0; i < 7; i++ {
+		go func() {
+			for py := range jobs{
+				y := float64(py)/height*(ymax-ymin) + ymin
+				for px := 0; px < width; px++{
+					x := float64(px)/width*(xmax-xmin) + xmin
+					z := complex(x, y)
+					// Image point (px, py) represents complex value z.
+					img.Set(px, py, mandelbrot(z))
+				}
+				w.Done()
+			}
+		}()
 	}
+
+	for py := 0; py < height; py++ {
+		w.Add(1)
+		jobs <- py
+	}
+	close(jobs)
+
+	w.Wait()
 	png.Encode(os.Stdout, img) // NOTE: ignoring errors
 }
 

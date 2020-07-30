@@ -26,18 +26,35 @@ func echo(c net.Conn, shout string, delay time.Duration) {
 
 //!+
 func handleConn(c net.Conn) {
+	fmt.Println("here")
 	input := bufio.NewScanner(c)
 	var w sync.WaitGroup
-	for input.Scan() {
-		w.Add(1)
-		go func() {
-			echo(c, input.Text(), 1*time.Second)
-			w.Done()
-		}()
+	defer func() {
+		w.Wait()
+		c.Close()
+	}()
+
+	lines := make(chan string)
+	go func() {
+		for input.Scan(){
+			lines <- input.Text()
+		}
+	}()
+
+	timer := time.NewTimer(10*time.Second)
+	for {
+		select {
+		case line := <-lines:
+			w.Add(1)
+			go func() {
+				echo(c, line, 1*time.Second)
+				w.Done()
+			}()
+		case <-timer.C:
+			fmt.Println("hanged for too long, break connection")
+			return
+		}
 	}
-	w.Wait()
-	// NOTE: ignoring potential errors from input.Err()
-	c.Close()
 }
 
 //!-

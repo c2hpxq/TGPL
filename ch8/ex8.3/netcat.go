@@ -7,6 +7,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -26,7 +27,11 @@ func main() {
 		done <- struct{}{} // signal the main goroutine
 	}()
 	mustCopy(conn, os.Stdin)
-	conn.Close()
+	tcpConn, ok := conn.(*net.TCPConn)
+	if !ok {
+		fmt.Println("not a tcp connection")
+	}
+	tcpConn.CloseWrite()
 	<-done // wait for background goroutine to finish
 }
 

@@ -7,21 +7,43 @@
 package main
 
 import (
+	"bufio"
 	"flag"
+	"fmt"
+	"github.com/google/syzkaller/pkg/osutil"
 	"io"
 	"log"
 	"net"
-	"time"
+	"os"
+	"strings"
 )
 
 func handleConn(c net.Conn) {
 	defer c.Close()
+	reader := bufio.NewReader(c)
 	for {
-		_, err := io.WriteString(c, time.Now().Format("15:04:05\n"))
+		cmd, err := reader.ReadString('\n')
 		if err != nil {
-			return // e.g., client disconnected
+			log.Fatal(err)
 		}
-		time.Sleep(1 * time.Second)
+		fmt.Println(cmd)
+		cmdArgs := strings.Split(cmd[:len(cmd)-1], " ")
+		switch cmdArgs[0] {
+		case "ls":
+			filenames, err := osutil.ListDir(".")
+			if err != nil {
+				continue
+			}
+			fmt.Fprintf(c, strings.Join(filenames, "\n"))
+		case "get":
+			f, err := os.Open(cmdArgs[1])
+			if err != nil {
+				continue
+			}
+			io.Copy(c, f)
+		case "close":
+			return
+		}
 	}
 }
 
@@ -34,6 +56,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("ftp starts serving.")
 	//!+
 	for {
 		conn, err := listener.Accept()
